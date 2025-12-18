@@ -5,8 +5,9 @@ node_modules/
 antigravity-accounts.json
 *.auth.json
 
-# local overrides
+# local overrides and config
 *.local.json
+notifications.local.json
 
 # os files
 .DS_Store

@@ -37,6 +37,16 @@ export class ValidationError extends Data.TaggedError("ValidationError")<{
   cause?: unknown
 }> {}
 
+export type SwarmErrors = 
+  | SwarmError 
+  | SessionNotFound 
+  | TaskNotFound 
+  | NotGitRepo 
+  | UncommittedChanges 
+  | GitError 
+  | FileError 
+  | ValidationError
+
 export const SWARM_DIR = `${process.env.HOME}/.swarm`
 export const WORKTREES_DIR = `${SWARM_DIR}/worktrees`
 export const SESSIONS_DIR = `${SWARM_DIR}/sessions`
@@ -141,8 +151,30 @@ export type TaskState = typeof TaskStateSchema.Type
 export type TasksState = typeof TasksStateSchema.Type
 export type MessageType = typeof MessageTypeSchema.Type
 export type Message = typeof MessageSchema.Type
+export type ReviewIssue = typeof ReviewIssueSchema.Type
 export type ReviewFeedback = typeof ReviewFeedbackSchema.Type
 export type Failure = typeof FailureSchema.Type
+
+export interface SwarmSession {
+  plan: Plan
+  tasks: TasksState
+  failure?: Failure
+}
+
+export interface WorkerContext {
+  sessionId: string
+  taskId: string
+  worktreePath: string
+  task: Subtask
+}
+
+export interface ReviewerContext {
+  sessionId: string
+  taskId: string
+  workerId: string
+  task: Subtask
+  changes: string
+}
 
 export function getSessionDir(sessionId: string): string {
   return `${SESSIONS_DIR}/${sessionId}`
