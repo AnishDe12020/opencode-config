@@ -46,8 +46,10 @@ parallel task execution with git worktree isolation:
 
 **macos / linux:**
 ```bash
-git clone https://github.com/AnishDe12020/opencode-config.git ~/.config/opencode && cd ~/.config/opencode && bun install
+[ -d ~/.config/opencode ] && mv ~/.config/opencode ~/.config/opencode.backup.$(date +%s) || true && git clone git@github.com:AnishDe12020/opencode-config.git ~/.config/opencode && cd ~/.config/opencode && bun install
 ```
+
+> **note:** existing `~/.config/opencode` will be backed up to `~/.config/opencode.backup.<timestamp>` before installing.
 
 ### authentication
 
