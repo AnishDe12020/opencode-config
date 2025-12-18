@@ -53,14 +53,24 @@ native desktop notifications for swarm events and session idle:
 
 ### interactive installer (recommended)
 
-**macos / linux:**
+**macos / linux (interactive):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s --
+```
+
+**non-interactive mode (install all components):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s -- --yes
+```
+
+**with authentication setup:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s -- --setup-auth
 ```
 
 the installer will:
 - ✓ check prerequisites (opencode, bun, git)
-- ✓ let you enable/disable components:
+- ✓ let you enable/disable components (or install all with `--yes`):
   - swarm orchestrator (parallel task execution)
   - custom agents (orchestrator, worker, reviewer)
   - slash commands (/swarm, /graphite, /review, etc)
@@ -68,6 +78,11 @@ the installer will:
 - ✓ backup existing config automatically
 - ✓ install dependencies
 - ✓ show post-install instructions with color output
+
+**flags:**
+- `--yes`, `-y`: non-interactive mode, installs all components
+- `--setup-auth`: guide through authentication setup after install
+- `--help`, `-h`: show help message
 
 ### manual install
 
@@ -78,6 +93,8 @@ if you prefer to install everything manually:
 ```
 
 ### authentication
+
+**interactive (with browser):**
 
 after cloning, authenticate with each provider:
 
@@ -94,6 +111,32 @@ opencode auth login
 opencode auth login
 # select: Google → OAuth with Google (Antigravity)
 ```
+
+**headless / ssh (manual token transfer):**
+
+if you're on a headless server or via SSH without browser access:
+
+1. **on your local machine with browser:**
+   ```bash
+   opencode auth login  # authenticate with each provider
+   ```
+
+2. **copy auth files to remote server:**
+   ```bash
+   scp ~/.config/opencode/anthropic.auth.json user@server:~/.config/opencode/
+   scp ~/.config/opencode/openai.auth.json user@server:~/.config/opencode/
+   scp ~/.config/opencode/antigravity-accounts.json user@server:~/.config/opencode/
+   ```
+
+3. **or use the installer's guided setup:**
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s -- --setup-auth
+   ```
+
+**required auth files:**
+- `anthropic.auth.json` - Claude (required for main agent)
+- `openai.auth.json` - ChatGPT (for oracle agent)
+- `antigravity-accounts.json` - Google/Gemini (for frontend/multimodal agents)
 
 ### verify setup
 

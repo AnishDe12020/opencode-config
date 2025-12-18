@@ -23,6 +23,7 @@ REPO_URL="git@github.com:AnishDe12020/opencode-config.git"
 INSTALL_DIR="$HOME/.config/opencode"
 BACKUP_DIR=""
 NON_INTERACTIVE=false
+SETUP_AUTH=false
 
 # Platform detection
 OS="$(uname -s)"
@@ -47,11 +48,16 @@ parse_args() {
                 NON_INTERACTIVE=true
                 shift
                 ;;
+            --setup-auth)
+                SETUP_AUTH=true
+                shift
+                ;;
             --help|-h)
                 echo "Usage: $0 [options]"
                 echo ""
                 echo "Options:"
                 echo "  --yes, -y               Non-interactive mode (installs all components)"
+                echo "  --setup-auth            Guide through authentication setup after install"
                 echo "  --help, -h              Show this help message"
                 echo ""
                 exit 0
@@ -487,6 +493,75 @@ configure_platform_optimizations() {
     fi
 }
 
+setup_authentication() {
+    print_section "Authentication Setup"
+    
+    echo ""
+    echo -e "${BOLD}Choose authentication method:${RESET}"
+    echo ""
+    echo -e "  ${CYAN}1. Interactive (requires browser)${RESET}"
+    echo -e "     Open browser to authenticate with each provider"
+    echo ""
+    echo -e "  ${CYAN}2. Headless (manual token entry)${RESET}"
+    echo -e "     Authenticate on another device, then copy tokens"
+    echo ""
+    
+    local method
+    while true; do
+        echo -ne "${YELLOW}?${RESET} Select method [1/2]: "
+        if [ ! -t 0 ] && [ -r /dev/tty ]; then
+            read -r method </dev/tty
+        else
+            read -r method
+        fi
+        
+        case "$method" in
+            1)
+                print_step "Starting interactive authentication..."
+                echo ""
+                echo -e "${CYAN}# Claude (required)${RESET}"
+                opencode auth login || true
+                echo ""
+                echo -e "${CYAN}# ChatGPT (for oracle agent)${RESET}"
+                opencode auth login || true
+                echo ""
+                echo -e "${CYAN}# Google Gemini (for frontend/multimodal)${RESET}"
+                opencode auth login || true
+                echo ""
+                print_success "Authentication complete"
+                break
+                ;;
+            2)
+                print_step "Headless authentication instructions:"
+                echo ""
+                echo -e "${YELLOW}On a machine with a browser:${RESET}"
+                echo -e "  1. Run: ${CYAN}opencode auth login${RESET}"
+                echo -e "  2. Authenticate with each provider"
+                echo -e "  3. Locate auth files in: ${CYAN}~/.config/opencode/${RESET}"
+                echo ""
+                echo -e "${YELLOW}Copy these files to this machine:${RESET}"
+                echo -e "  ${CYAN}- anthropic.auth.json${RESET}     (Claude)"
+                echo -e "  ${CYAN}- openai.auth.json${RESET}        (ChatGPT)"
+                echo -e "  ${CYAN}- antigravity-accounts.json${RESET} (Google/Gemini)"
+                echo ""
+                echo -e "${YELLOW}Transfer command example:${RESET}"
+                echo -e "  ${CYAN}scp user@local-machine:~/.config/opencode/*.json ~/.config/opencode/${RESET}"
+                echo ""
+                print_warning "Press Enter when files are copied..."
+                if [ ! -t 0 ] && [ -r /dev/tty ]; then
+                    read -r </dev/tty
+                else
+                    read -r
+                fi
+                break
+                ;;
+            *)
+                echo -e "${CROSS} Please select 1 or 2"
+                ;;
+        esac
+    done
+}
+
 print_post_install() {
     print_section "Installation Complete!"
     
@@ -509,22 +584,21 @@ print_post_install() {
     [ "$ENABLE_NOTIFICATIONS" = true ] && echo -e "  ${CHECK} Desktop notifications"
     echo ""
     
-    echo -e "${BOLD}Next steps:${RESET}"
-    echo ""
-    echo -e "${ARROW} Authenticate with providers:"
-    echo ""
-    echo -e "  ${CYAN}# Claude (required)${RESET}"
-    echo -e "  opencode auth login"
-    echo -e "  ${YELLOW}→${RESET} Select: Anthropic → Claude Pro/Max"
-    echo ""
-    echo -e "  ${CYAN}# ChatGPT (for oracle agent)${RESET}"
-    echo -e "  opencode auth login"
-    echo -e "  ${YELLOW}→${RESET} Select: OpenAI → ChatGPT Plus/Pro"
-    echo ""
-    echo -e "  ${CYAN}# Google Gemini (for frontend/multimodal)${RESET}"
-    echo -e "  opencode auth login"
-    echo -e "  ${YELLOW}→${RESET} Select: Google → OAuth with Google (Antigravity)"
-    echo ""
+    if [ "$SETUP_AUTH" = false ]; then
+        echo -e "${BOLD}Next steps:${RESET}"
+        echo ""
+        echo -e "${ARROW} Authenticate with providers:"
+        echo ""
+        echo -e "  ${CYAN}# Interactive mode:${RESET}"
+        echo -e "  opencode auth login"
+        echo ""
+        echo -e "  ${CYAN}# Or run installer with auth setup:${RESET}"
+        echo -e "  curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s -- --setup-auth"
+        echo ""
+        echo -e "  ${CYAN}# Headless/SSH? See README for manual token setup${RESET}"
+        echo ""
+    fi
+    
     echo -e "${ARROW} Start OpenCode:"
     echo -e "  ${CYAN}opencode${RESET}"
     echo ""
@@ -563,6 +637,10 @@ main() {
     setup_notifications
     
     configure_platform_optimizations
+    
+    if [ "$SETUP_AUTH" = true ]; then
+        setup_authentication
+    fi
     
     print_post_install
 }
