@@ -23,12 +23,21 @@ REPO_URL="git@github.com:AnishDe12020/opencode-config.git"
 INSTALL_DIR="$HOME/.config/opencode"
 BACKUP_DIR=""
 
+# Platform detection
+OS="$(uname -s)"
+case "$OS" in
+    Darwin) PLATFORM="macos" ;;
+    Linux)  PLATFORM="linux" ;;
+    *)      PLATFORM="unknown" ;;
+esac
+
 # Component flags
 INSTALL_SWARM=true
 INSTALL_AGENTS=true
 INSTALL_COMMANDS=true
 INSTALL_MCP_MGREP=true
 INSTALL_MCP_PLAYWRITER=true
+ENABLE_NOTIFICATIONS=true
 
 # Functions
 print_header() {
@@ -87,12 +96,36 @@ prompt_yes_no() {
     done
 }
 
+detect_package_manager() {
+    if [ "$PLATFORM" = "macos" ]; then
+        if command -v brew &> /dev/null; then
+            echo "brew"
+        fi
+    elif [ "$PLATFORM" = "linux" ]; then
+        if command -v apt &> /dev/null; then
+            echo "apt"
+        elif command -v dnf &> /dev/null; then
+            echo "dnf"
+        elif command -v yum &> /dev/null; then
+            echo "yum"
+        elif command -v pacman &> /dev/null; then
+            echo "pacman"
+        fi
+    fi
+}
+
 check_prerequisites() {
     print_section "Checking Prerequisites"
     
+    print_step "Detected platform: ${BOLD}$PLATFORM${RESET}"
+    local pkg_mgr=$(detect_package_manager)
+    if [ -n "$pkg_mgr" ]; then
+        print_step "Package manager: ${BOLD}$pkg_mgr${RESET}"
+    fi
+    echo ""
+    
     local all_good=true
     
-    # Check opencode
     if command -v opencode &> /dev/null; then
         print_success "opencode found ($(opencode --version))"
     else
@@ -101,20 +134,34 @@ check_prerequisites() {
         all_good=false
     fi
     
-    # Check bun
     if command -v bun &> /dev/null; then
         print_success "bun found ($(bun --version))"
     else
         print_error "bun not found"
         echo -e "  ${ARROW} Install from: ${BLUE}https://bun.sh${RESET}"
+        if [ "$PLATFORM" = "macos" ] && [ -n "$pkg_mgr" ]; then
+            echo -e "  ${ARROW} Quick install: ${CYAN}brew install oven-sh/bun/bun${RESET}"
+        elif [ "$PLATFORM" = "linux" ]; then
+            echo -e "  ${ARROW} Quick install: ${CYAN}curl -fsSL https://bun.sh/install | bash${RESET}"
+        fi
         all_good=false
     fi
     
-    # Check git
     if command -v git &> /dev/null; then
         print_success "git found"
     else
         print_error "git not found"
+        if [ "$PLATFORM" = "macos" ] && [ "$pkg_mgr" = "brew" ]; then
+            echo -e "  ${ARROW} Install: ${CYAN}brew install git${RESET}"
+        elif [ "$PLATFORM" = "linux" ]; then
+            if [ "$pkg_mgr" = "apt" ]; then
+                echo -e "  ${ARROW} Install: ${CYAN}sudo apt install git${RESET}"
+            elif [ "$pkg_mgr" = "dnf" ]; then
+                echo -e "  ${ARROW} Install: ${CYAN}sudo dnf install git${RESET}"
+            elif [ "$pkg_mgr" = "pacman" ]; then
+                echo -e "  ${ARROW} Install: ${CYAN}sudo pacman -S git${RESET}"
+            fi
+        fi
         all_good=false
     fi
     
@@ -173,6 +220,18 @@ configure_components() {
     else
         INSTALL_MCP_PLAYWRITER=false
         print_warning "playwriter MCP disabled"
+    fi
+    
+    echo ""
+    echo -e "${BOLD}Platform Features:${RESET}"
+    echo ""
+    
+    if prompt_yes_no "Enable desktop notifications (task completion alerts)" "y"; then
+        ENABLE_NOTIFICATIONS=true
+        print_success "Notifications enabled"
+    else
+        ENABLE_NOTIFICATIONS=false
+        print_warning "Notifications disabled"
     fi
 }
 
@@ -254,6 +313,128 @@ install_dependencies() {
     print_success "Dependencies installed"
 }
 
+setup_notifications() {
+    if [ "$ENABLE_NOTIFICATIONS" = false ]; then
+        return
+    fi
+    
+    print_section "Setting Up Notifications"
+    
+    local notifier_installed=false
+    
+    if [ "$PLATFORM" = "macos" ]; then
+        if command -v terminal-notifier &> /dev/null; then
+            print_success "terminal-notifier already installed"
+            notifier_installed=true
+        elif command -v osascript &> /dev/null; then
+            print_success "osascript available (built-in)"
+            notifier_installed=true
+        else
+            print_warning "No notification tool found"
+            if command -v brew &> /dev/null; then
+                if prompt_yes_no "Install terminal-notifier via brew?" "y"; then
+                    print_step "Installing terminal-notifier..."
+                    brew install terminal-notifier > /dev/null 2>&1
+                    print_success "terminal-notifier installed"
+                    notifier_installed=true
+                fi
+            fi
+        fi
+    elif [ "$PLATFORM" = "linux" ]; then
+        if command -v notify-send &> /dev/null; then
+            print_success "notify-send already installed"
+            notifier_installed=true
+        else
+            print_warning "notify-send not found"
+            local pkg_mgr=$(detect_package_manager)
+            
+            if [ -n "$pkg_mgr" ]; then
+                local install_cmd=""
+                case "$pkg_mgr" in
+                    apt) install_cmd="sudo apt install libnotify-bin" ;;
+                    dnf) install_cmd="sudo dnf install libnotify" ;;
+                    yum) install_cmd="sudo yum install libnotify" ;;
+                    pacman) install_cmd="sudo pacman -S libnotify" ;;
+                esac
+                
+                if [ -n "$install_cmd" ]; then
+                    echo -e "  ${ARROW} Install with: ${CYAN}$install_cmd${RESET}"
+                    if prompt_yes_no "Install notify-send now?" "y"; then
+                        print_step "Installing libnotify..."
+                        eval "$install_cmd" > /dev/null 2>&1
+                        print_success "libnotify installed"
+                        notifier_installed=true
+                    fi
+                fi
+            fi
+        fi
+    fi
+    
+    if [ "$notifier_installed" = true ]; then
+        print_step "Enabling session-notification hook..."
+        cd "$INSTALL_DIR"
+        
+        if [ -f "oh-my-opencode.json" ]; then
+            if command -v jq &> /dev/null; then
+                local disabled_hooks=$(jq -r '.disabled_hooks // [] | join(",")' oh-my-opencode.json)
+                if [[ "$disabled_hooks" == *"session-notification"* ]]; then
+                    jq '.disabled_hooks = (.disabled_hooks // [] | map(select(. != "session-notification")))' oh-my-opencode.json > oh-my-opencode.json.tmp
+                    mv oh-my-opencode.json.tmp oh-my-opencode.json
+                    print_success "Notifications enabled in config"
+                else
+                    print_success "Notifications already enabled"
+                fi
+            fi
+        fi
+    else
+        print_warning "Notifications setup skipped - install tools manually if needed"
+    fi
+}
+
+configure_platform_optimizations() {
+    print_section "Platform Optimizations"
+    
+    if [ "$PLATFORM" = "macos" ]; then
+        if [ "$INSTALL_SWARM" = true ]; then
+            print_step "Checking Spotlight indexing..."
+            
+            local swarm_dir="$INSTALL_DIR/.swarm"
+            if [ -d "$swarm_dir" ]; then
+                if [ ! -f "$swarm_dir/.metadata_never_index" ]; then
+                    print_step "Excluding .swarm/ from Spotlight indexing..."
+                    touch "$swarm_dir/.metadata_never_index"
+                    print_success "Spotlight exclusion added"
+                else
+                    print_success "Spotlight already excluded"
+                fi
+            fi
+        fi
+        
+        print_success "macOS optimizations applied"
+        
+    elif [ "$PLATFORM" = "linux" ]; then
+        if [ "$INSTALL_SWARM" = true ]; then
+            print_step "Checking inotify limits..."
+            
+            local current_watches=$(cat /proc/sys/fs/inotify/max_user_watches 2>/dev/null || echo "unknown")
+            local current_instances=$(cat /proc/sys/fs/inotify/max_user_instances 2>/dev/null || echo "unknown")
+            
+            if [ "$current_watches" != "unknown" ] && [ "$current_watches" -lt 524288 ]; then
+                print_warning "inotify watches limit is low ($current_watches)"
+                echo -e "  ${ARROW} Recommended for large projects: 524288"
+                echo -e "  ${ARROW} Add to ${CYAN}/etc/sysctl.conf${RESET}:"
+                echo -e "      ${CYAN}fs.inotify.max_user_watches=524288${RESET}"
+                echo -e "      ${CYAN}fs.inotify.max_user_instances=512${RESET}"
+                echo -e "  ${ARROW} Apply with: ${CYAN}sudo sysctl -p${RESET}"
+            else
+                print_success "inotify limits OK"
+            fi
+        fi
+        
+        print_success "Linux optimizations checked"
+    fi
+}
+
 print_post_install() {
     print_section "Installation Complete!"
     
@@ -265,6 +446,16 @@ print_post_install() {
         print_warning "Previous config backed up to: $BACKUP_DIR"
         echo ""
     fi
+    
+    echo -e "${BOLD}Installed components:${RESET}"
+    echo ""
+    [ "$INSTALL_SWARM" = true ] && echo -e "  ${CHECK} Swarm orchestrator"
+    [ "$INSTALL_AGENTS" = true ] && echo -e "  ${CHECK} Custom agents"
+    [ "$INSTALL_COMMANDS" = true ] && echo -e "  ${CHECK} Slash commands"
+    [ "$INSTALL_MCP_MGREP" = true ] && echo -e "  ${CHECK} mgrep MCP"
+    [ "$INSTALL_MCP_PLAYWRITER" = true ] && echo -e "  ${CHECK} playwriter MCP"
+    [ "$ENABLE_NOTIFICATIONS" = true ] && echo -e "  ${CHECK} Desktop notifications"
+    echo ""
     
     echo -e "${BOLD}Next steps:${RESET}"
     echo ""
@@ -315,6 +506,10 @@ main() {
     remove_unwanted_components
     
     install_dependencies
+    
+    setup_notifications
+    
+    configure_platform_optimizations
     
     print_post_install
 }
