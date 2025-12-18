@@ -22,6 +22,7 @@ STAR="${YELLOW}★${RESET}"
 REPO_URL="git@github.com:AnishDe12020/opencode-config.git"
 INSTALL_DIR="$HOME/.config/opencode"
 BACKUP_DIR=""
+NON_INTERACTIVE=false
 
 # Platform detection
 OS="$(uname -s)"
@@ -29,7 +30,7 @@ case "$OS" in
     Darwin) PLATFORM="macos" ;;
     Linux)  PLATFORM="linux" ;;
     *)      PLATFORM="unknown" ;;
-esac
+ esac
 
 # Component flags
 INSTALL_SWARM=true
@@ -39,7 +40,31 @@ INSTALL_MCP_MGREP=true
 INSTALL_MCP_PLAYWRITER=true
 ENABLE_NOTIFICATIONS=true
 
-# Functions
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --yes|--non-interactive|-y)
+                NON_INTERACTIVE=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: $0 [options]"
+                echo ""
+                echo "Options:"
+                echo "  --yes, -y               Non-interactive mode (installs all components)"
+                echo "  --help, -h              Show this help message"
+                echo ""
+                exit 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                echo "Run with --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+}
+
 print_header() {
     echo ""
     echo -e "${MAGENTA}${BOLD}"
@@ -77,15 +102,35 @@ prompt_yes_no() {
     local default="${2:-y}"
     local response
     
+    if [ "$NON_INTERACTIVE" = true ]; then
+        case "$default" in
+            [Yy]*) return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    
     if [ "$default" = "y" ]; then
         prompt="$prompt [Y/n]: "
     else
         prompt="$prompt [y/N]: "
     fi
     
+    if [ ! -t 0 ] && [ ! -r /dev/tty ]; then
+        echo ""
+        print_error "No interactive terminal available and --yes flag not provided"
+        echo -e "  ${ARROW} When piping the installer, use: ${CYAN}curl ... | bash -s -- --yes${RESET}"
+        echo -e "  ${ARROW} Or run directly: ${CYAN}bash install.sh${RESET}"
+        exit 1
+    fi
+    
+    local input_source="/dev/stdin"
+    if [ ! -t 0 ]; then
+        input_source="/dev/tty"
+    fi
+    
     while true; do
         echo -ne "${YELLOW}?${RESET} $prompt"
-        read -r response
+        read -r response <"$input_source"
         response=${response:-$default}
         
         case "$response" in
@@ -173,6 +218,13 @@ check_prerequisites() {
 }
 
 configure_components() {
+    if [ "$NON_INTERACTIVE" = true ]; then
+        print_section "Component Configuration"
+        echo -e "${BOLD}Installing all components (non-interactive mode)${RESET}"
+        print_success "All components enabled"
+        return
+    fi
+    
     print_section "Component Configuration"
     
     echo -e "${BOLD}Select components to install:${RESET}"
@@ -485,8 +537,9 @@ print_post_install() {
     echo ""
 }
 
-# Main installation flow
 main() {
+    parse_args "$@"
+    
     print_header
     
     check_prerequisites
@@ -514,5 +567,4 @@ main() {
     print_post_install
 }
 
-# Run main
-main
+main "$@"
