@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# auth tokens (sensitive)
+antigravity-accounts.json
+*.auth.json
+
+# local overrides
+*.local.json
+
+# os files
+.DS_Store
+Thumbs.db
