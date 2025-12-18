@@ -42,14 +42,31 @@ parallel task execution with git worktree isolation:
 - [bun](https://bun.sh) installed
 - subscriptions: claude max, chatgpt pro, google gemini (optional but recommended)
 
-### one-liner install
+### interactive installer (recommended)
 
 **macos / linux:**
 ```bash
-[ -d ~/.config/opencode ] && mv ~/.config/opencode ~/.config/opencode.backup.$(date +%s) || true && git clone git@github.com:AnishDe12020/opencode-config.git ~/.config/opencode && cd ~/.config/opencode && bun install
+curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash
 ```
 
-> **note:** existing `~/.config/opencode` will be backed up to `~/.config/opencode.backup.<timestamp>` before installing.
+the installer will:
+- ✓ check prerequisites (opencode, bun, git)
+- ✓ let you enable/disable components:
+  - swarm orchestrator (parallel task execution)
+  - custom agents (orchestrator, worker, reviewer)
+  - slash commands (/swarm, /graphite, /review, etc)
+  - mcp servers (mgrep, playwriter)
+- ✓ backup existing config automatically
+- ✓ install dependencies
+- ✓ show post-install instructions with color output
+
+### manual install
+
+if you prefer to install everything manually:
+
+```bash
+[ -d ~/.config/opencode ] && mv ~/.config/opencode ~/.config/opencode.backup.$(date +%s) || true && git clone git@github.com:AnishDe12020/opencode-config.git ~/.config/opencode && cd ~/.config/opencode && bun install
+```
 
 ### authentication
 
