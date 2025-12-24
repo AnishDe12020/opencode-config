@@ -123,20 +123,13 @@ if you're on a headless server or via SSH without browser access:
 
 2. **copy auth files to remote server:**
    ```bash
-   scp ~/.config/opencode/anthropic.auth.json user@server:~/.config/opencode/
-   scp ~/.config/opencode/openai.auth.json user@server:~/.config/opencode/
-   scp ~/.config/opencode/antigravity-accounts.json user@server:~/.config/opencode/
+   scp ~/.local/share/opencode/auth.json user@server:~/.local/share/opencode/auth.json  # all the provider's auth code is stored in a single json file
    ```
 
 3. **or use the installer's guided setup:**
    ```bash
    curl -fsSL https://raw.githubusercontent.com/AnishDe12020/opencode-config/main/install.sh | bash -s -- --setup-auth
    ```
-
-**required auth files:**
-- `anthropic.auth.json` - Claude (required for main agent)
-- `openai.auth.json` - ChatGPT (for oracle agent)
-- `antigravity-accounts.json` - Google/Gemini (for frontend/multimodal agents)
 
 ### verify setup
 
